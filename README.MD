@@ -1,50 +1,70 @@
-# Sasquatch Universal Builder (RC 1)
-**Developed by: M-Tarantino**
+# 🛠️ Sasquatch Universal Builder
+**A Memory-Safe Automation Script for Compiling Sasquatch on Modern Systems & Termux.**
 
+[![Language](https://img.shields.io/badge/Language-Python%203-blue.svg)](https://www.python.org/)
+[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Android%20(Termux)-green.svg)](https://github.com/termux/termux-app)
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
-[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Termux%20(Android)-green.svg)](#)
 
-## 📌 Overview
-**Sasquatch** is the industry-standard tool for extracting non-standard SquashFS images, which are frequently encountered during embedded firmware analysis. However, the original project (by devttys0) has been unmaintained for years, causing it to fail on modern compilers (GCC 10+) due to stricter linker rules (e.g., `duplicate symbol: verbose`).
+---
 
-The **Sasquatch Universal Builder** is a modern orchestration script designed to bridge this gap. It automates the entire process of fetching, patching, and compiling Sasquatch, ensuring it works flawlessly on today's systems—including mobile environments like **Termux**.
+### 📖 The Problem
+`Sasquatch` (by @devttys0) is the industry-standard tool for extracting non-standard SquashFS images during firmware analysis. However, the original source code hasn't been updated in years, causing it to fail on modern compilers (GCC 10+) due to stricter linker rules (e.g., `duplicate symbol: verbose`).
 
-## ✨ Key Features
-* **On-the-fly Refactoring:** Dynamically patches legacy C-headers using regex to resolve `extern` variable conflicts.
-* **Smart Environment Detection:** Automatically identifies the OS (Debian/Ubuntu, Arch, Fedora, Alpine, or Termux) and handles dependency installation.
-* **Binary-Safe Patching:** Uses `latin-1` encoding to handle legacy source files and patches without corruption.
-* **Termux Optimized:** Tailored to work within the Android/Termux environment, turning your phone into a mobile firmware analysis station.
-* **Legacy Compliance:** Automatically enforces `-fcommon` flags where necessary.
+### 💡 The Solution
+The **Sasquatch Universal Builder** is a modern orchestration script that:
+1.  **Automates** the entire environment setup and dependency handling.
+2.  **Fetches** the original source code dynamically from the source.
+3.  **Patches** legacy C-headers on-the-fly using regex to resolve `extern` variable conflicts.
+4.  **Compiles** and installs the tool safely, even on Android/Termux environments.
 
-## 🚀 Installation & Usage
+---
 
-### 1. Prerequisites
-You only need `python3` and `wget` installed. The builder will handle the rest.
+### 📋 Prerequisites
 
-### 2. Execution
-Download the builder script and run it:
+Before running the builder, ensure your system has the basics. You can install everything with a single command:
 
-    wget https://raw.githubusercontent.com/M-Tarantino/Sasquatch-Universal-Builder/main/SASQUATCH_UNIVERSAL_BUILDER.py
+* **Debian / Ubuntu:** `sudo apt update && sudo apt install git python3 build-essential zlib1g-dev liblzo2-dev liblzma-dev lzma -y`
+* **Termux (Android):** `pkg update && pkg install git python build-essential zlib liblzo liblzma lzma-repack -y`
+* **Arch Linux:** `sudo pacman -S git python base-devel zlib lzo xz`
+
+---
+
+### 🚀 Installation & Usage
+
+1.  **Clone the repository:**
+    ```bash
+    git clone [https://github.com/M-Tarantino/Sasquatch-Universal-Builder.git](https://github.com/M-Tarantino/Sasquatch-Universal-Builder.git)
+    cd Sasquatch-Universal-Builder
+    ```
+
+2.  **Run the automated builder:**
+    ```bash
     python3 SASQUATCH_UNIVERSAL_BUILDER.py
+    ```
 
-### 3. Usage
-Once the build is successful, run Sasquatch as follows:
+3.  **Verify the installation:**
+    Simply type `sasquatch -h` in your terminal.
 
-    sasquatch [options] filesystem.squashfs
+---
 
-## 🛠 Technical Background (The "Why")
-This project was born out of the necessity to keep vital security tools alive. The main challenge with the original Sasquatch was the way global variables were declared in multiple `.c` files. Modern compilers default to `-fno-common`, which treats these as duplicate symbols.
+### 🛠️ Technical Background
+Instead of providing a static, pre-patched source, this builder **analyzes the source code during the build process**. 
+* **Dynamic Refactoring:** Uses Python's `re.sub` with `latin-1` encoding to handle legacy files without corruption.
+* **Compiler Flags:** Automatically enforces `-fcommon` flags where necessary to bridge the gap between GCC versions.
+* **Mobile Ready:** Specifically optimized for the unique environment of Termux.
 
-Instead of providing a static, pre-patched source, this builder **analyzes the source code during the build process** and applies the necessary C-level modifications automatically.
+---
 
-## 🤝 Credits & Acknowledgments
-* **Original Logic:** Craig Heffner ([@devttys0](https://github.com/devttys0)).
-* **SquashFS Foundation:** Phillip Lougher for the original implementation.
-* **Engineering & Automation:** Developed and maintained by **M-Tarantino**.
+### 🤝 Credits & Acknowledgments
+* **Original Tool:** [Sasquatch](https://github.com/devttys0/sasquatch) by **Craig Heffner** (@devttys0).
+* **Engineering & Automation:** Developed by **Muneeb Tarantino**.
 
-## ⚖️ License
-This script is licensed under the **GNU General Public License v2.0**.
-* The underlying SquashFS code and patches remain under their respective GPLv2 licenses.
+---
+
+### 👤 Author
+**Muneeb Tarantino**
+* **LinkedIn:** [muneeb-tarantino](https://www.linkedin.com/in/muneeb-tarantino/)
+* **GitHub:** [@M-Tarantino](https://github.com/M-Tarantino)
 
 ---
 *Note: This project was developed using an AI-assisted engineering workflow to solve legacy build issues in record time.*
