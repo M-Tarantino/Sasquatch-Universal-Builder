@@ -19,13 +19,12 @@ The **Sasquatch Universal Builder** is a modern orchestration script that:
 
 ---
 
-### 📋 Prerequisites
+### 📋 Smart Dependency Management
+The builder is fully automated. When you run the script, it detects your OS and package manager to install the required tools for you. It supports:
+* **Package Managers:** `apt` (Debian/Ubuntu), `pkg` (Termux), `pacman` (Arch), `dnf` (Fedora), and `apk` (Alpine).
+* **Automated Install of:** `gcc`/`clang`, `make`, `patch`, `zlib`, `lzma`, `lzo`, and `git`.
 
-Before running the builder, ensure your system has the basics. You can install everything with a single command:
-
-* **Debian / Ubuntu:** `sudo apt update && sudo apt install git python3 build-essential zlib1g-dev liblzo2-dev liblzma-dev lzma -y`
-* **Termux (Android):** `pkg update && pkg install git python build-essential zlib liblzo liblzma lzma-repack -y`
-* **Arch Linux:** `sudo pacman -S git python base-devel zlib lzo xz`
+*Note: On Linux, the script will request `sudo` to handle the installation. On Termux, it runs natively.*
 
 ---
 
@@ -51,7 +50,7 @@ Before running the builder, ensure your system has the basics. You can install e
 Instead of providing a static, pre-patched source, this builder **analyzes the source code during the build process**. 
 * **Dynamic Refactoring:** Uses Python's `re.sub` with `latin-1` encoding to handle legacy files without corruption.
 * **Compiler Flags:** Automatically enforces `-fcommon` flags where necessary to bridge the gap between GCC versions.
-* **Mobile Ready:** Specifically optimized for the unique environment of Termux.
+* **Mobile Ready:** Specifically optimized for the unique environment of Termux (Android).
 
 ---
 
