@@ -8,23 +8,23 @@
 ---
 
 ### 📖 The Problem
-`Sasquatch` (by @devttys0) is the industry-standard tool for extracting non-standard SquashFS images during firmware analysis. However, the original source code hasn't been updated in years, causing it to fail on modern compilers (GCC 10+) due to stricter linker rules (e.g., `duplicate symbol: verbose`).
+`Sasquatch` (by @devttys0) is the industry-standard tool for extracting non-standard SquashFS images. However, the original code hasn't been updated in years, causing it to fail on modern compilers (GCC 10+) due to stricter linker rules (e.g., `duplicate symbol: verbose`).
 
-### 💡 The Solution
-The **Sasquatch Universal Builder** is a modern orchestration script that:
-1.  **Automates** the entire environment setup and dependency handling.
-2.  **Fetches** the original source code dynamically from the source.
-3.  **Patches** legacy C-headers on-the-fly using regex to resolve `extern` variable conflicts.
-4.  **Compiles** and installs the tool safely, even on Android/Termux environments.
+### 💡 The Solution: Pure Automation
+The **Sasquatch Universal Builder** is designed to be a "run-and-forget" solution. Unlike other forks, this is a modern orchestrator that:
+1.  **Smart Environment Detection:** Identifies your OS and package manager.
+2.  **Auto-Dependency Install:** Automatically installs `gcc`, `make`, `zlib`, `lzma`, etc.
+3.  **Dynamic Patching:** Fixes legacy C-headers on-the-fly using regex.
+4.  **Zero Manual Configuration:** It just works.
 
 ---
 
-### 📋 Smart Dependency Management
-The builder is fully automated. When you run the script, it detects your OS and package manager to install the required tools for you. It supports:
-* **Package Managers:** `apt` (Debian/Ubuntu), `pkg` (Termux), `pacman` (Arch), `dnf` (Fedora), and `apk` (Alpine).
-* **Automated Install of:** `gcc`/`clang`, `make`, `patch`, `zlib`, `lzma`, `lzo`, and `git`.
+### 📋 Prerequisites
+To keep it simple, you only need two things installed on your system:
+* **Python 3.x**
+* **Git**
 
-*Note: On Linux, the script will request `sudo` to handle the installation. On Termux, it runs natively.*
+**The builder handles the rest.** It supports `apt`, `pkg` (Termux), `pacman`, `dnf`, and `apk` out of the box.
 
 ---
 
@@ -47,10 +47,10 @@ The builder is fully automated. When you run the script, it detects your OS and 
 ---
 
 ### 🛠️ Technical Background
-Instead of providing a static, pre-patched source, this builder **analyzes the source code during the build process**. 
-* **Dynamic Refactoring:** Uses Python's `re.sub` with `latin-1` encoding to handle legacy files without corruption.
-* **Compiler Flags:** Automatically enforces `-fcommon` flags where necessary to bridge the gap between GCC versions.
-* **Mobile Ready:** Specifically optimized for the unique environment of Termux (Android).
+This builder doesn't just copy files. It **analyzes the source code during the build process**:
+* **Regex Refactoring:** Uses Python's `re.sub` to resolve `extern` variable conflicts dynamically.
+* **Compiler Bridge:** Automatically enforces `-fcommon` flags to bridge the gap between GCC versions.
+* **Mobile First:** Specifically optimized for the unique environment of **Termux (Android)**.
 
 ---
 
