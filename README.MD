@@ -19,12 +19,19 @@ The **Sasquatch Universal Builder** is designed to be a "run-and-forget" solutio
 
 ---
 
-### 📋 Prerequisites
-To keep it simple, you only need two things installed on your system:
-* **Python 3.x**
-* **Git**
+---
 
-**The builder handles the rest.** It supports `apt`, `pkg` (Termux), `pacman`, `dnf`, and `apk` out of the box.
+### 📋 Prerequisites & Automation
+The builder is designed to be as "hands-off" as possible. 
+* **Requirements:** You only need `python3` and `git` installed.
+* **Automation:** The script detects your OS and installs all build-essential tools and libraries.
+* **Note:** On Linux systems, the script will request `sudo` access to install these dependencies. On **Termux**, it runs natively without root.
+
+---
+
+### ⚠️ Current Limitations
+* **XZ Compression:** This version focuses on maximum compatibility across legacy and modern GCC versions. Therefore, XZ-compressed SquashFS support is currently disabled.
+* **Environment:** Optimized and tested for Ubuntu 20.04+, Arch Linux, and Termux.
 
 ---
 
