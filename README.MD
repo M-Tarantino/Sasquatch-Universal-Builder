@@ -17,7 +17,6 @@ The **Sasquatch Universal Builder** is designed to be a "run-and-forget" solutio
 3.  **Dynamic Patching:** Fixes legacy C-headers on-the-fly using regex.
 4.  **Zero Manual Configuration:** It just works.
 
----
 
 ---
 
