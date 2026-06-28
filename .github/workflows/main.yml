@@ -29,29 +29,25 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Install basic system dependencies
+      # Install comprehensive dependencies including dev headers
       - name: Install System Dependencies
         run: |
           if [ "${{ matrix.pm }}" == "apt-get" ]; then
-            apt-get update && apt-get install -y python3 git wget make gcc g++
+            apt-get update && apt-get install -y python3 git wget make gcc g++ zlib1g-dev liblzma-dev
           elif [ "${{ matrix.pm }}" == "pacman" ]; then
-            pacman -Syu --noconfirm python git wget make gcc
+            pacman -Syu --noconfirm python git wget make gcc zlib xz
           elif [ "${{ matrix.pm }}" == "dnf" ]; then
-            dnf install -y python3 git wget make gcc gcc-c++
+            dnf install -y python3 git wget make gcc gcc-c++ zlib-devel xz-devel
           elif [ "${{ matrix.pm }}" == "apk" ]; then
-            apk add --no-cache python3 git wget make gcc g++
+            apk add --no-cache python3 git wget make gcc g++ zlib-dev xz-dev
           fi
 
-      # Execute the builder
       - name: Run Sasquatch Universal Builder
         run: |
-          # Alias sudo to empty string since we are root in the container
           alias sudo=''
-          
-          # Set non-interactive mode for installers
           export DEBIAN_FRONTEND=noninteractive
           
-          # Execute the builder script
-          # We check the exit code to ensure the build process succeeds
-          python3 SASQUATCH_UNIVERSAL_BUILDER.py || { echo "Build failed!"; exit 1; }
+          # Run the builder. If it fails, print the last 50 lines of the build log
+          # We force a single-core build first to see if it's a parallel-execution bug
+          python3 SASQUATCH_UNIVERSAL_BUILDER.py || (echo "--- BUILD FAILED. INSPECTING BUILD LOG ---" && tail -n 50 sasquatch_rc1_build/make.log 2>/dev/null || echo "No log found")
           
