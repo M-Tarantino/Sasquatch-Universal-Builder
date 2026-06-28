@@ -1,9 +1,9 @@
-name: Sasquatch Universal Builder CI
+name: Sasquatch Universal CI
 
 on: [push, pull_request]
 
 jobs:
-  test:
+  test-matrix:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -11,12 +11,16 @@ jobs:
         include:
           - distro: debian
             image: debian:latest
+            pm: apt-get
           - distro: archlinux
             image: archlinux:latest
+            pm: pacman
           - distro: fedora
             image: fedora:latest
+            pm: dnf
           - distro: alpine
             image: alpine:latest
+            pm: apk
 
     container:
       image: ${{ matrix.image }}
@@ -27,18 +31,24 @@ jobs:
 
       - name: Install System Dependencies
         run: |
-          if [ "${{ matrix.distro }}" == "debian" ]; then
+          if [ "${{ matrix.pm }}" == "apt-get" ]; then
             apt-get update && apt-get install -y python3 git wget make gcc g++
-          elif [ "${{ matrix.distro }}" == "archlinux" ]; then
+          elif [ "${{ matrix.pm }}" == "pacman" ]; then
             pacman -Syu --noconfirm python git wget make gcc
-          elif [ "${{ matrix.distro }}" == "fedora" ]; then
+          elif [ "${{ matrix.pm }}" == "dnf" ]; then
             dnf install -y python3 git wget make gcc gcc-c++
-          elif [ "${{ matrix.distro }}" == "alpine" ]; then
+          elif [ "${{ matrix.pm }}" == "apk" ]; then
             apk add --no-cache python3 git wget make gcc g++
           fi
 
       - name: Run Sasquatch Universal Builder
         run: |
-          # Testlauf des Builders
-          # Da das Skript selbst die deps installiert, hier nur die Ausführung
+          # Alias für sudo, da wir im Container bereits root sind[span_5](start_span)[span_5](end_span)[span_6](start_span)[span_6](end_span)
+          alias sudo=''
+          
+          # Umgebung auf nicht-interaktiv setzen
+          export DEBIAN_FRONTEND=noninteractive
+          
+          # Skript ausführen (Test-Modus)
+          # Wir nutzen --help oder einen Dummy-Aufruf, um die Logik zu prüfen[span_7](start_span)[span_7](end_span)
           python3 SASQUATCH_UNIVERSAL_BUILDER.py --help
