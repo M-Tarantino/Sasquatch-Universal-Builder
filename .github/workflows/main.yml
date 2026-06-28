@@ -29,6 +29,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      # Install basic system dependencies
       - name: Install System Dependencies
         run: |
           if [ "${{ matrix.pm }}" == "apt-get" ]; then
@@ -41,14 +42,16 @@ jobs:
             apk add --no-cache python3 git wget make gcc g++
           fi
 
+      # Execute the builder
       - name: Run Sasquatch Universal Builder
         run: |
-          # Alias für sudo, da wir im Container bereits root sind[span_5](start_span)[span_5](end_span)[span_6](start_span)[span_6](end_span)
+          # Alias sudo to empty string since we are root in the container
           alias sudo=''
           
-          # Umgebung auf nicht-interaktiv setzen
+          # Set non-interactive mode for installers
           export DEBIAN_FRONTEND=noninteractive
           
-          # Skript ausführen (Test-Modus)
-          # Wir nutzen --help oder einen Dummy-Aufruf, um die Logik zu prüfen[span_7](start_span)[span_7](end_span)
-          python3 SASQUATCH_UNIVERSAL_BUILDER.py --help
+          # Execute the builder script
+          # We check the exit code to ensure the build process succeeds
+          python3 SASQUATCH_UNIVERSAL_BUILDER.py || { echo "Build failed!"; exit 1; }
+          
