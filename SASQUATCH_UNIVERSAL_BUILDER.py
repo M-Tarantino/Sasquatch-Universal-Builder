@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-SASQUATCH UNIVERSAL BUILDER - RC 1
+SASQUATCH UNIVERSAL BUILDER - RC 2
 ------------------------------------------------------------
 Developer: M-Tarantino
 Original Logic: Craig Heffner (devttys0)
@@ -8,8 +8,9 @@ License: GNU General Public License v2 (GPLv2)
 
 Description: 
 This script automates the compilation of Sasquatch on modern 
-Linux systems (Debian, Arch, etc.) and Termux. It dynamically 
+Linux systems (Debian, Arch, Alpine, etc.) and Termux. It dynamically 
 patches legacy C code to comply with modern GCC/Clang standards.
+Includes musl/Alpine compatibility fixes.
 ------------------------------------------------------------
 """
 
@@ -40,7 +41,7 @@ def log(msg, color=Colors.INFO):
 def banner():
     print(f"{Colors.HEADER}{Colors.BOLD}")
     print("=" * 60)
-    print("      SASQUATCH UNIVERSAL BUILDER - RC 1")
+    print("      SASQUATCH UNIVERSAL BUILDER - RC 2")
     print("=" * 60)
     print("      Developer: M-Tarantino")
     print("      Original Logic: Craig Heffner (devttys0)")
@@ -75,7 +76,7 @@ def detect_env():
         'pkg_mgr': None,
         'packages': []
     }
-    
+
     # Check for Termux
     if os.path.exists('/data/data/com.termux') or 'com.termux' in os.environ.get('PREFIX', ''):
         info['is_termux'] = True
@@ -101,19 +102,19 @@ def detect_env():
     elif shutil.which('apk'):
         info['pkg_mgr'] = 'apk'
         info['prefix'] = '/usr'
-        info['packages'] = ['git', 'patch', 'make', 'gcc', 'g++', 'zlib-dev', 'xz-dev', 'lzo-dev', 'binutils', 'wget']
-    
+        info['packages'] = ['git', 'patch', 'make', 'gcc', 'g++', 'musl-dev', 'zlib-dev', 'xz-dev', 'lzo-dev', 'binutils', 'wget']
+
     return info
 
 def install_deps(env):
     """Install required dependencies based on detected package manager"""
     log(f"Installing dependencies for {env['pkg_mgr'] or 'Unknown OS'}...")
-    
+
     if not env['pkg_mgr']:
         log("No package manager detected. Please install dependencies manually:", Colors.WARN)
         log("Required: git, patch, make, gcc/clang, zlib, liblzma, lzo", Colors.WARN)
         return
-    
+
     if env['pkg_mgr'] == 'pkg':
         # Termux
         for pkg in env['packages']:
@@ -133,34 +134,34 @@ def install_deps(env):
     elif env['pkg_mgr'] == 'apk':
         # Alpine
         run_cmd(f"sudo apk add --no-cache {' '.join(env['packages'])}", silent=True)
-    
+
     log("✓ Dependencies installed", Colors.OK)
 
 def setup_source():
     """Download and extract source code"""
     log("Setting up build directory...")
-    
+
     if os.path.exists(BUILD_DIR):
         shutil.rmtree(BUILD_DIR)
     os.makedirs(BUILD_DIR)
     os.chdir(BUILD_DIR)
-    
+
     log("Cloning Sasquatch repository...")
     run_cmd(f"git clone {REPO_URL} repo", silent=True)
-    
+
     log("Downloading SquashFS 4.3...")
     run_cmd(f"wget -q {SQUASHFS_URL}")
-    
+
     log("Extracting archive...")
     run_cmd("tar -zxf squashfs4.3.tar.gz")
-    
+
     log("✓ Source code ready", Colors.OK)
 
 def apply_patches():
     """Apply original Sasquatch patches"""
     log("Applying Sasquatch patches...")
     os.chdir("squashfs4.3")
-    
+
     # Apply the original patch from the repo
     patch_file = "../repo/patches/patch0.txt"
     if os.path.exists(patch_file):
@@ -169,23 +170,48 @@ def apply_patches():
             patch_content = f.read().replace('\r\n', '\n')
         with open("sasquatch.patch", 'w', encoding='utf-8') as f:
             f.write(patch_content)
-        
+
         run_cmd("patch -p0 -f -i sasquatch.patch", check=False)
         log("✓ Patches applied", Colors.OK)
     else:
         log("Warning: Patch file not found, continuing without patches", Colors.WARN)
 
+def create_compat_header():
+    """Generates a compatibility header for missing symbols (musl/Alpine support)"""
+    log("Creating compatibility header (compat.h)...")
+    content = """#ifndef SASQUATCH_COMPAT_H
+#define SASQUATCH_COMPAT_H
+#include <sys/sysmacros.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <signal.h>
+#ifndef FNM_EXTMATCH
+#define FNM_EXTMATCH 0
+#endif
+#ifndef S_IFBLK
+#define S_IFBLK 0060000
+#endif
+#ifndef S_IFCHR
+#define S_IFCHR 0020000
+#endif
+#endif
+"""
+    os.makedirs("squashfs-tools", exist_ok=True)
+    with open("squashfs-tools/compat.h", "w") as f:
+        f.write(content)
+    log("✓ compat.h created", Colors.OK)
+
 def fix_error_header():
     """Fix the duplicate symbol 'verbose' error"""
     log("Fixing duplicate symbol 'verbose'...")
-    
+
     tools_path = "squashfs-tools"
     error_h = os.path.join(tools_path, "error.h")
-    
+
     if os.path.exists(error_h):
         with open(error_h, 'r') as f:
             content = f.read()
-        
+
         # Change definition to declaration
         content = re.sub(
             r'^\s*int\s+verbose\s*(=\s*0)?\s*;',
@@ -193,66 +219,68 @@ def fix_error_header():
             content,
             flags=re.MULTILINE
         )
-        
+
         with open(error_h, 'w') as f:
             f.write(content)
-        
+
         log("✓ Fixed error.h", Colors.OK)
-    
+
     # Add definition to unsquashfs.c
     unsquashfs_c = os.path.join(tools_path, "unsquashfs.c")
     if os.path.exists(unsquashfs_c):
         with open(unsquashfs_c, 'r') as f:
             content = f.read()
-        
+
         if 'int verbose = 0;' not in content:
             lines = content.split('\n')
             last_include = -1
             for i, line in enumerate(lines):
                 if line.strip().startswith('#include'):
                     last_include = i
-            
+
             if last_include >= 0:
                 lines.insert(last_include + 1, '')
                 lines.insert(last_include + 2, '/* Global verbose variable definition */')
                 lines.insert(last_include + 3, 'int verbose = 0;')
                 lines.insert(last_include + 4, '')
-                
+
                 with open(unsquashfs_c, 'w') as f:
                     f.write('\n'.join(lines))
-                
+
                 log("✓ Fixed unsquashfs.c", Colors.OK)
 
 def fix_fnm_extmatch():
-    """Fix FNM_EXTMATCH compatibility"""
+    """Fix FNM_EXTMATCH compatibility (legacy, now handled in compat.h)"""
     log("Fixing FNM_EXTMATCH compatibility...")
-    
+
     tools_path = "squashfs-tools"
     unsquashfs_c = os.path.join(tools_path, "unsquashfs.c")
-    
+
     if os.path.exists(unsquashfs_c):
         with open(unsquashfs_c, 'r') as f:
             content = f.read()
-        
-        fnm_fix = "#ifndef FNM_EXTMATCH\n#define FNM_EXTMATCH 0\n#endif\n\n"
-        if not content.startswith("#ifndef FNM_EXTMATCH"):
-            content = fnm_fix + content
-        
-        with open(unsquashfs_c, 'w') as f:
-            f.write(content)
-        
-        log("✓ Fixed FNM_EXTMATCH", Colors.OK)
+
+        # Only add if compat.h is not already included
+        if '#include "compat.h"' not in content:
+            fnm_fix = "#ifndef FNM_EXTMATCH\n#define FNM_EXTMATCH 0\n#endif\n\n"
+            if not content.startswith("#ifndef FNM_EXTMATCH"):
+                content = fnm_fix + content
+
+            with open(unsquashfs_c, 'w') as f:
+                f.write(content)
+
+            log("✓ Fixed FNM_EXTMATCH", Colors.OK)
 
 def disable_xz_wrapper():
     """Disable XZ wrapper to avoid conflicts"""
     log("Disabling XZ wrapper...")
-    
+
     tools_path = "squashfs-tools"
     xz_files = [
         os.path.join(tools_path, "xz_wrapper.c"),
         os.path.join(tools_path, "xz_wrapper.h")
     ]
-    
+
     for xz_file in xz_files:
         if os.path.exists(xz_file):
             with open(xz_file, 'w') as f:
@@ -262,89 +290,115 @@ def disable_xz_wrapper():
 def fix_makefile(env):
     """Fix Makefile for modern compilers"""
     log("Fixing Makefile...")
-    
+
     tools_path = "squashfs-tools"
     makefile = os.path.join(tools_path, "Makefile")
     prefix = env['prefix']
-    
+
     if not os.path.exists(makefile):
         log("Error: Makefile not found!", Colors.FAIL)
         return
-    
+
     with open(makefile, 'r') as f:
         content = f.read()
-    
+
     # Remove -Werror
     content = content.replace("-Werror", "")
-    
+
     lines = content.split('\n')
-    
+
     # Fix CFLAGS
     for i, line in enumerate(lines):
         if line.startswith("CFLAGS") and './LZMA' in line:
             lines[i] = f"CFLAGS := -g -O2 -I{prefix}/include -I. -I./LZMA/lzma465/C -I./LZMA/lzmalt -I./LZMA/lzmadaptive/C/7zip/Compress/LZMA_Lib"
-    
+
     # Fix LIBS - ADD liblzmalib.a
     for i, line in enumerate(lines):
         if line.startswith("LIBS +=") and '-llzma' in line:
             lines[i] = f"LIBS += -lz -lm -L{prefix}/lib -llzo2 -llzma -L./LZMA/lzmadaptive/C/7zip/Compress/LZMA_Lib -llzmalib"
-    
+
     # Remove XZ_SUPPORT
     for i, line in enumerate(lines):
         if '-DXZ_SUPPORT' in line:
             lines[i] = line.replace('-DXZ_SUPPORT', '')
-    
+
     content = '\n'.join(lines)
-    
+
     with open(makefile, 'w') as f:
         f.write(content)
-    
+
     log("✓ Makefile fixed", Colors.OK)
 
 def apply_universal_fixes(env):
     """Apply all necessary fixes for modern compilation"""
     log("Applying universal fixes for modern compilers...")
-    
+
+    # Create compat.h for musl/Alpine support
+    create_compat_header()
+
+    # Inject compat.h into source files
+    for c_file in ["mksquashfs.c", "unsquashfs.c", "pseudo.c", "action.c"]:
+        path = os.path.join("squashfs-tools", c_file)
+        if os.path.exists(path):
+            with open(path, "r") as f:
+                data = f.read()
+            # Insert after the first include
+            if '#include "compat.h"' not in data:
+                data = re.sub(r'(#include <.*>\n)', r'\1#include "compat.h"\n', data, count=1)
+                with open(path, "w") as f:
+                    f.write(data)
+                log(f"✓ Injected compat.h into {c_file}", Colors.OK)
+
+    # Fix verbose duplicate
     fix_error_header()
+
+    # Fix FNM_EXTMATCH (legacy fallback)
     fix_fnm_extmatch()
+
+    # Disable XZ wrapper
     disable_xz_wrapper()
+
+    # Fix Makefile
     fix_makefile(env)
-    
+
     log("✓ All fixes applied", Colors.OK)
 
 def build_and_deploy(env):
     """Compile Sasquatch and deploy binary"""
     log("Starting build process...")
-    
+
     tools_path = "squashfs-tools"
     os.chdir(tools_path)
-    
+
     # Clean build
     run_cmd("make clean", check=False, silent=True)
-    
+
     # Build with parallel jobs
     nproc = os.cpu_count() or 2
     log(f"Building with {nproc} parallel jobs...")
-    
+
     build_env = os.environ.copy()
     if env['is_termux']:
         build_env["CC"] = "clang"
         build_env["CXX"] = "clang++"
-    
-    result = run_cmd(f"make -j{nproc}")
-    
+
+    # Use -fcommon for modern GCC versions (fixes multiple definition errors)
+    build_env["CFLAGS"] = build_env.get("CFLAGS", "") + " -fcommon"
+
+    result = run_cmd(f"make -j{nproc}", check=False)
+
     if result and result.returncode == 0 and os.path.exists("sasquatch"):
         log("✓ BUILD SUCCESSFUL! 🎉", Colors.OK)
-        
+
         # Save binary locally
         local_bin = "../../sasquatch_binary"
         shutil.copy("sasquatch", local_bin)
         log(f"✓ Binary saved: {BUILD_DIR}/sasquatch_binary", Colors.OK)
-        
+
         # Auto-install if possible
         target = f"{env['prefix']}/bin/sasquatch"
         log("", Colors.INFO)
-        
+
         if env['is_termux']:
             # Termux: Can install directly
             try:
@@ -360,10 +414,10 @@ def build_and_deploy(env):
             log("To install system-wide, run:", Colors.INFO)
             log(f"  sudo cp {os.getcwd()}/sasquatch {target}", Colors.INFO)
             log(f"  sudo chmod +x {target}", Colors.INFO)
-        
+
         log("", Colors.INFO)
         log("Usage: sasquatch [options] filesystem.squashfs [destination]", Colors.INFO)
-        
+
         return True
     else:
         log("✗ BUILD FAILED", Colors.FAIL)
@@ -377,32 +431,32 @@ def build_and_deploy(env):
 def main():
     """Main execution flow"""
     banner()
-    
+
     try:
         # Detect environment
         env = detect_env()
         log(f"Detected: {env['os']} ({env['pkg_mgr'] or 'unknown'})", Colors.INFO)
-        
+
         # Install dependencies
         install_deps(env)
-        
+
         # Setup source code
         setup_source()
-        
+
         # Apply original patches
         apply_patches()
-        
+
         # Apply modern compiler fixes
         apply_universal_fixes(env)
-        
+
         # Build and deploy
         success = build_and_deploy(env)
-        
+
         if success:
             sys.exit(0)
         else:
             sys.exit(1)
-            
+
     except KeyboardInterrupt:
         log("\nBuild cancelled by user", Colors.WARN)
         sys.exit(130)
