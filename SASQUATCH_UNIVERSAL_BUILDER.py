@@ -82,28 +82,28 @@ def detect_env():
         info['is_termux'] = True
         info['prefix'] = os.environ.get('PREFIX', '/data/data/com.termux/files/usr')
         info['pkg_mgr'] = 'pkg'
-        info['packages'] = ['git', 'patch', 'make', 'clang', 'zlib', 'liblzma', 'xz-utils', 'lzo', 'lzo2', 'binutils', 'wget']
+        info['packages'] = ['git', 'patch', 'make', 'clang', 'zlib', 'liblzma', 'xz-utils', 'lzo', 'lzo2', 'binutils', 'wget', 'curl']
     # Check for Debian/Ubuntu
     elif shutil.which('apt'):
         info['pkg_mgr'] = 'apt'
         info['prefix'] = '/usr'
         # FIX: Added python3 to Debian/Ubuntu packages
-        info['packages'] = ['python3', 'git', 'patch', 'make', 'gcc', 'g++', 'zlib1g-dev', 'liblzma-dev', 'liblzo2-dev', 'binutils', 'wget']
+        info['packages'] = ['python3', 'git', 'patch', 'make', 'gcc', 'g++', 'zlib1g-dev', 'liblzma-dev', 'liblzo2-dev', 'binutils', 'wget', 'curl']
     # Check for Arch Linux
     elif shutil.which('pacman'):
         info['pkg_mgr'] = 'pacman'
         info['prefix'] = '/usr'
-        info['packages'] = ['git', 'patch', 'make', 'gcc', 'zlib', 'xz', 'lzo', 'binutils', 'wget']
+        info['packages'] = ['git', 'patch', 'make', 'gcc', 'zlib', 'xz', 'lzo', 'binutils', 'wget', 'curl']
     # Check for Fedora/RHEL
     elif shutil.which('dnf'):
         info['pkg_mgr'] = 'dnf'
         info['prefix'] = '/usr'
-        info['packages'] = ['git', 'patch', 'make', 'gcc', 'gcc-c++', 'zlib-devel', 'xz-devel', 'lzo-devel', 'binutils', 'wget']
+        info['packages'] = ['git', 'patch', 'make', 'gcc', 'gcc-c++', 'zlib-devel', 'xz-devel', 'lzo-devel', 'binutils', 'wget', 'curl']
     # Check for Alpine
     elif shutil.which('apk'):
         info['pkg_mgr'] = 'apk'
         info['prefix'] = '/usr'
-        info['packages'] = ['git', 'patch', 'make', 'gcc', 'g++', 'musl-dev', 'zlib-dev', 'xz-dev', 'lzo-dev', 'binutils', 'wget']
+        info['packages'] = ['git', 'patch', 'make', 'gcc', 'g++', 'musl-dev', 'zlib-dev', 'xz-dev', 'lzo-dev', 'binutils', 'wget', 'curl']
 
     return info
 
@@ -148,15 +148,32 @@ def setup_source():
     os.chdir(BUILD_DIR)
 
     log("Cloning Sasquatch repository...")
-    run_cmd(f"git clone {REPO_URL} repo", silent=True)
+    result = run_cmd(f"git clone {REPO_URL} repo", silent=True)
+    if not result or result.returncode != 0:
+        log("Error cloning repository", Colors.FAIL)
+        return False
 
     log("Downloading SquashFS 4.3...")
-    run_cmd(f"wget -q {SQUASHFS_URL}")
+    result = run_cmd(f"wget -q {SQUASHFS_URL}")
+    if not result or result.returncode != 0:
+        log("Error downloading SquashFS with wget, trying curl...", Colors.WARN)
+        result = run_cmd(f"curl -L -o squashfs4.3.tar.gz {SQUASHFS_URL}")
+        if not result or result.returncode != 0:
+            log("Error: Could not download SquashFS 4.3", Colors.FAIL)
+            return False
 
     log("Extracting archive...")
-    run_cmd("tar -zxf squashfs4.3.tar.gz")
+    result = run_cmd("tar -zxf squashfs4.3.tar.gz")
+    if not result or result.returncode != 0:
+        log("Error extracting archive", Colors.FAIL)
+        return False
+
+    if not os.path.exists("squashfs4.3"):
+        log("Error: squashfs4.3 directory not found after extraction", Colors.FAIL)
+        return False
 
     log("✓ Source code ready", Colors.OK)
+    return True
 
 def apply_patches():
     """Apply original Sasquatch patches"""
@@ -524,7 +541,9 @@ def main():
         install_deps(env)
 
         # Setup source code
-        setup_source()
+        if not setup_source():
+            log("Failed to setup source code", Colors.FAIL)
+            sys.exit(1)
 
         # Apply original patches
         apply_patches()
