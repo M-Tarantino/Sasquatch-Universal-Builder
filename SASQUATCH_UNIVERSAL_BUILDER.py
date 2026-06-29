@@ -88,7 +88,7 @@ def detect_env():
         info['pkg_mgr'] = 'apt'
         info['prefix'] = '/usr'
         # FIX: Added python3 to Debian/Ubuntu packages
-        info['packages'] = ['git', 'patch', 'make', 'gcc', 'g++', 'python3', 'zlib1g-dev', 'liblzma-dev', 'liblzo2-dev', 'binutils', 'wget']
+        info['packages'] = ['python3', 'git', 'patch', 'make', 'gcc', 'g++', 'zlib1g-dev', 'liblzma-dev', 'liblzo2-dev', 'binutils', 'wget']
     # Check for Arch Linux
     elif shutil.which('pacman'):
         info['pkg_mgr'] = 'pacman'
@@ -250,6 +250,44 @@ def fix_error_header():
 
                 log("✓ Fixed unsquashfs.c", Colors.OK)
 
+def fix_lzo_wrapper():
+    """FIX #2: Fix LZO header includes - handle different include path conventions
+    
+    Some systems have lzo headers in <lzo/lzoconf.h>, others in <lzo.h>
+    This normalizes to the most compatible form.
+    """
+    log("Fixing LZO wrapper includes...")
+    
+    tools_path = "squashfs-tools"
+    lzo_wrapper = os.path.join(tools_path, "lzo_wrapper.c")
+    
+    if os.path.exists(lzo_wrapper):
+        with open(lzo_wrapper, 'r') as f:
+            content = f.read()
+        
+        # Check if lzo headers are being included at all
+        if '#include' in content and 'lzo' in content:
+            # Try to make includes more robust
+            # Some Alpine/Arch systems might need different paths
+            # We'll add fallback includes if needed
+            
+            if '#include <lzo/lzoconf.h>' in content:
+                # Add a compatibility header check
+                compat_check = '#include <lzo/lzoconf.h>\n'
+                compat_check += '#ifndef LZO_E_OK\n'
+                compat_check += '  #include <lzo.h>\n'
+                compat_check += '#endif\n'
+                
+                content = content.replace(
+                    '#include <lzo/lzoconf.h>',
+                    compat_check
+                )
+            
+            with open(lzo_wrapper, 'w') as f:
+                f.write(content)
+            
+            log("✓ Fixed LZO wrapper includes", Colors.OK)
+
 def fix_signal_handlers():
     """FIX #1: Fix signal handler signatures to accept int parameter
     
@@ -390,6 +428,9 @@ def apply_universal_fixes(env):
 
     # Fix verbose duplicate
     fix_error_header()
+
+    # FIX #2: Fix LZO wrapper includes (NEW)
+    fix_lzo_wrapper()
 
     # FIX #1: Fix signal handlers (NEW)
     fix_signal_handlers()
