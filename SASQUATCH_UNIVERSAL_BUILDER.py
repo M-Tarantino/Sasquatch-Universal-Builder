@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-SASQUATCH UNIVERSAL BUILDER - RC 2
+SASQUATCH UNIVERSAL BUILDER - RC 2 (FIXED)
 ------------------------------------------------------------
 Developer: M-Tarantino
 Original Logic: Craig Heffner (devttys0)
@@ -87,7 +87,8 @@ def detect_env():
     elif shutil.which('apt'):
         info['pkg_mgr'] = 'apt'
         info['prefix'] = '/usr'
-        info['packages'] = ['git', 'patch', 'make', 'gcc', 'g++', 'zlib1g-dev', 'liblzma-dev', 'liblzo2-dev', 'binutils', 'wget']
+        # FIX: Added python3 to Debian/Ubuntu packages
+        info['packages'] = ['git', 'patch', 'make', 'gcc', 'g++', 'python3', 'zlib1g-dev', 'liblzma-dev', 'liblzo2-dev', 'binutils', 'wget']
     # Check for Arch Linux
     elif shutil.which('pacman'):
         info['pkg_mgr'] = 'pacman'
@@ -249,6 +250,44 @@ def fix_error_header():
 
                 log("✓ Fixed unsquashfs.c", Colors.OK)
 
+def fix_signal_handlers():
+    """FIX #1: Fix signal handler signatures to accept int parameter
+    
+    POSIX signal handlers must have signature: void handler(int sig)
+    Not: void handler(void)
+    
+    This fixes errors like:
+    error: passing argument 2 of 'signal' from incompatible pointer type
+    signal(SIGWINCH, sigwinch_handler);
+    """
+    log("Fixing signal handler signatures...")
+    
+    tools_path = "squashfs-tools"
+    unsquashfs_c = os.path.join(tools_path, "unsquashfs.c")
+    
+    if os.path.exists(unsquashfs_c):
+        with open(unsquashfs_c, 'r') as f:
+            content = f.read()
+        
+        # Fix sigwinch_handler signature: void sigwinch_handler() -> void sigwinch_handler(int sig)
+        content = re.sub(
+            r'void\s+sigwinch_handler\s*\(\s*\)',
+            'void sigwinch_handler(int sig)',
+            content
+        )
+        
+        # Fix sigalrm_handler signature: void sigalrm_handler() -> void sigalrm_handler(int sig)
+        content = re.sub(
+            r'void\s+sigalrm_handler\s*\(\s*\)',
+            'void sigalrm_handler(int sig)',
+            content
+        )
+        
+        with open(unsquashfs_c, 'w') as f:
+            f.write(content)
+        
+        log("✓ Fixed signal handler signatures", Colors.OK)
+
 def fix_fnm_extmatch():
     """Fix FNM_EXTMATCH compatibility (legacy, now handled in compat.h)"""
     log("Fixing FNM_EXTMATCH compatibility...")
@@ -351,6 +390,9 @@ def apply_universal_fixes(env):
 
     # Fix verbose duplicate
     fix_error_header()
+
+    # FIX #1: Fix signal handlers (NEW)
+    fix_signal_handlers()
 
     # Fix FNM_EXTMATCH (legacy fallback)
     fix_fnm_extmatch()
