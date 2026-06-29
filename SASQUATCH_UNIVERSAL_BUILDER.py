@@ -20,6 +20,7 @@ import sys
 import shutil
 import platform
 import re
+import argparse
 
 class Colors:
     HEADER = '\033[95m'
@@ -34,9 +35,16 @@ class Colors:
 REPO_URL = "https://github.com/devttys0/sasquatch.git"
 SQUASHFS_URL = "https://downloads.sourceforge.net/project/squashfs/squashfs/squashfs4.3/squashfs4.3.tar.gz"
 BUILD_DIR = "sasquatch_rc1_build"
+VERBOSE = False  # Global flag for verbose output
 
 def log(msg, color=Colors.INFO):
     print(f"{color}[*] {msg}{Colors.RESET}")
+
+def vlog(msg, color=Colors.INFO):
+    """Verbose log - only prints if VERBOSE flag is set"""
+    global VERBOSE
+    if VERBOSE:
+        print(f"{color}[V] {msg}{Colors.RESET}")
 
 def banner():
     print(f"{Colors.HEADER}{Colors.BOLD}")
@@ -110,6 +118,7 @@ def detect_env():
 def install_deps(env):
     """Install required dependencies based on detected package manager"""
     log(f"Installing dependencies for {env['pkg_mgr'] or 'Unknown OS'}...")
+    vlog(f"Packages to install: {', '.join(env['packages'])}")
 
     if not env['pkg_mgr']:
         log("No package manager detected. Please install dependencies manually:", Colors.WARN)
@@ -120,67 +129,108 @@ def install_deps(env):
     in_container = os.path.exists('/.dockerenv') or os.environ.get('GITHUB_ACTIONS') == 'true'
     sudo_prefix = "" if in_container else "sudo "
 
+    if in_container:
+        vlog("Running in container - no sudo needed")
+    else:
+        vlog("Running on host system - using sudo")
+
     if env['pkg_mgr'] == 'pkg':
         # Termux
         for pkg in env['packages']:
             log(f"Installing {pkg}...")
-            run_cmd(f"pkg install -y {pkg}", silent=True, check=False)
+            run_cmd(f"pkg install -y {pkg}", silent=not VERBOSE, check=False)
     elif env['pkg_mgr'] == 'apt':
         # Debian/Ubuntu
-        if not in_container:
-            log("Note: Using sudo for dependency installation", Colors.WARN)
-        run_cmd(f"{sudo_prefix}apt-get update -y", silent=True, check=False)
-        run_cmd(f"{sudo_prefix}apt-get install -y {' '.join(env['packages'])}", silent=True, check=False)
+        vlog("Running apt-get update...")
+        result = run_cmd(f"{sudo_prefix}apt-get update -y", silent=not VERBOSE, check=False)
+        if result and result.returncode == 0:
+            vlog("✓ apt-get update succeeded", Colors.OK)
+        else:
+            vlog("✗ apt-get update failed", Colors.WARN)
+        
+        vlog(f"Running apt-get install for {len(env['packages'])} packages...")
+        result = run_cmd(f"{sudo_prefix}apt-get install -y {' '.join(env['packages'])}", silent=not VERBOSE, check=False)
+        if result and result.returncode == 0:
+            vlog("✓ apt-get install succeeded", Colors.OK)
+        else:
+            vlog("✗ apt-get install failed", Colors.WARN)
+            
     elif env['pkg_mgr'] == 'pacman':
         # Arch Linux
-        run_cmd(f"{sudo_prefix}pacman -S --noconfirm {' '.join(env['packages'])}", silent=True, check=False)
+        vlog(f"Running pacman install for {len(env['packages'])} packages...")
+        result = run_cmd(f"{sudo_prefix}pacman -S --noconfirm {' '.join(env['packages'])}", silent=not VERBOSE, check=False)
+        if result and result.returncode == 0:
+            vlog("✓ pacman install succeeded", Colors.OK)
+        else:
+            vlog("✗ pacman install failed", Colors.WARN)
+            
     elif env['pkg_mgr'] == 'dnf':
         # Fedora/RHEL
-        run_cmd(f"{sudo_prefix}dnf install -y {' '.join(env['packages'])}", silent=True, check=False)
+        vlog(f"Running dnf install for {len(env['packages'])} packages...")
+        result = run_cmd(f"{sudo_prefix}dnf install -y {' '.join(env['packages'])}", silent=not VERBOSE, check=False)
+        if result and result.returncode == 0:
+            vlog("✓ dnf install succeeded", Colors.OK)
+        else:
+            vlog("✗ dnf install failed", Colors.WARN)
+            
     elif env['pkg_mgr'] == 'apk':
         # Alpine
-        run_cmd(f"{sudo_prefix}apk add --no-cache {' '.join(env['packages'])}", silent=True, check=False)
+        vlog(f"Running apk add for {len(env['packages'])} packages...")
+        result = run_cmd(f"{sudo_prefix}apk add --no-cache {' '.join(env['packages'])}", silent=not VERBOSE, check=False)
+        if result and result.returncode == 0:
+            vlog("✓ apk add succeeded", Colors.OK)
+        else:
+            vlog("✗ apk add failed", Colors.WARN)
 
-    log("✓ Dependencies installed", Colors.OK)
+    log("✓ Dependencies installation step completed", Colors.OK)
 
 def setup_source():
     """Download and extract source code"""
     log("Setting up build directory...")
 
     if os.path.exists(BUILD_DIR):
+        vlog(f"Removing existing build directory: {BUILD_DIR}")
         shutil.rmtree(BUILD_DIR)
     os.makedirs(BUILD_DIR)
+    vlog(f"Created build directory: {BUILD_DIR}")
     os.chdir(BUILD_DIR)
+    vlog(f"Changed to directory: {os.getcwd()}")
 
     log("Cloning Sasquatch repository...")
-    result = run_cmd(f"git clone {REPO_URL} repo", silent=False, check=False)
+    vlog(f"Repository URL: {REPO_URL}")
+    result = run_cmd(f"git clone {REPO_URL} repo", silent=not VERBOSE, check=False)
     if not result or result.returncode != 0:
-        log("Error cloning repository", Colors.FAIL)
+        log("✗ Error cloning repository", Colors.FAIL)
         if result and result.stderr:
             log(f"Error details: {result.stderr}", Colors.FAIL)
         return False
+    log("✓ Repository cloned successfully", Colors.OK)
 
     log("Downloading SquashFS 4.3...")
-    result = run_cmd(f"wget -q {SQUASHFS_URL}", check=False)
+    vlog(f"Download URL: {SQUASHFS_URL}")
+    result = run_cmd(f"wget -v {SQUASHFS_URL}", check=False, silent=not VERBOSE)
     if not result or result.returncode != 0:
-        log("Error downloading SquashFS with wget, trying curl...", Colors.WARN)
-        result = run_cmd(f"curl -L -o squashfs4.3.tar.gz {SQUASHFS_URL}", check=False)
+        log("✗ wget failed, trying curl as fallback...", Colors.WARN)
+        result = run_cmd(f"curl -v -L -o squashfs4.3.tar.gz {SQUASHFS_URL}", check=False, silent=not VERBOSE)
         if not result or result.returncode != 0:
-            log("Error: Could not download SquashFS 4.3", Colors.FAIL)
+            log("✗ Error: Could not download SquashFS 4.3 with wget or curl", Colors.FAIL)
             if result and result.stderr:
                 log(f"Error details: {result.stderr}", Colors.FAIL)
             return False
+    log("✓ SquashFS 4.3 downloaded successfully", Colors.OK)
 
     log("Extracting archive...")
-    result = run_cmd("tar -zxf squashfs4.3.tar.gz", check=False)
+    result = run_cmd("tar -zxvf squashfs4.3.tar.gz", check=False, silent=not VERBOSE)
     if not result or result.returncode != 0:
-        log("Error extracting archive", Colors.FAIL)
+        log("✗ Error extracting archive", Colors.FAIL)
         if result and result.stderr:
             log(f"Error details: {result.stderr}", Colors.FAIL)
         return False
+    log("✓ Archive extracted successfully", Colors.OK)
 
     if not os.path.exists("squashfs4.3"):
-        log("Error: squashfs4.3 directory not found after extraction", Colors.FAIL)
+        log("✗ Error: squashfs4.3 directory not found after extraction", Colors.FAIL)
+        vlog(f"Contents of current directory: {os.listdir('.')}")
         return False
 
     log("✓ Source code ready", Colors.OK)
@@ -541,6 +591,22 @@ def build_and_deploy(env):
 
 def main():
     """Main execution flow"""
+    global VERBOSE
+    
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(
+        description='SASQUATCH UNIVERSAL BUILDER - RC 2',
+        epilog='Example: python3 SASQUATCH_UNIVERSAL_BUILDER.py --verbose'
+    )
+    parser.add_argument('--verbose', '-v', action='store_true', 
+                        help='Enable verbose output')
+    args = parser.parse_args()
+    
+    VERBOSE = args.verbose
+    
+    if VERBOSE:
+        vlog("Verbose mode enabled")
+    
     banner()
 
     try:
