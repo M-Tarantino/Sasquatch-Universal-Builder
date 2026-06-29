@@ -46,7 +46,9 @@ jobs:
               lzo-dev patch binutils-dev
           fi
 
-
-- name: Run Sasquatch Universal Builder
-  shell: bash
-  run: /usr/bin/python3 SASQUATCH_UNIVERSAL_BUILDER.py
+      - name: Run Sasquatch Universal Builder
+        shell: bash
+        run: |
+          # The Python script now automatically injects a compat.h file 
+          # to resolve missing definitions on musl-based systems.
+          /usr/bin/python3 SASQUATCH_UNIVERSAL_BUILDER.py
