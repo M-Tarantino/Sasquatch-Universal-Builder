@@ -196,22 +196,31 @@ def setup_source():
     os.chdir(BUILD_DIR)
     vlog(f"Changed to directory: {os.getcwd()}")
 
+    # Configure git for HTTPS (disable SSL verification as fallback)
+    vlog("Configuring git for HTTPS...")
+    run_cmd("git config --global http.sslVerify false", silent=True, check=False)
+
     log("Cloning Sasquatch repository...")
     vlog(f"Repository URL: {REPO_URL}")
     result = run_cmd(f"git clone {REPO_URL} repo", silent=not VERBOSE, check=False)
     if not result or result.returncode != 0:
-        log("✗ Error cloning repository", Colors.FAIL)
-        if result and result.stderr:
-            log(f"Error details: {result.stderr}", Colors.FAIL)
-        return False
+        log("✗ Git clone with HTTPS failed, trying HTTP...", Colors.WARN)
+        http_url = REPO_URL.replace("https://", "http://")
+        vlog(f"Trying HTTP URL: {http_url}")
+        result = run_cmd(f"git clone {http_url} repo", silent=not VERBOSE, check=False)
+        if not result or result.returncode != 0:
+            log("✗ Error cloning repository", Colors.FAIL)
+            if result and result.stderr:
+                log(f"Error details: {result.stderr}", Colors.FAIL)
+            return False
     log("✓ Repository cloned successfully", Colors.OK)
 
     log("Downloading SquashFS 4.3...")
     vlog(f"Download URL: {SQUASHFS_URL}")
-    result = run_cmd(f"wget -v {SQUASHFS_URL}", check=False, silent=not VERBOSE)
+    result = run_cmd(f"wget --no-check-certificate {SQUASHFS_URL}", check=False, silent=not VERBOSE)
     if not result or result.returncode != 0:
         log("✗ wget failed, trying curl as fallback...", Colors.WARN)
-        result = run_cmd(f"curl -v -L -o squashfs4.3.tar.gz {SQUASHFS_URL}", check=False, silent=not VERBOSE)
+        result = run_cmd(f"curl -k -L -o squashfs4.3.tar.gz {SQUASHFS_URL}", check=False, silent=not VERBOSE)
         if not result or result.returncode != 0:
             log("✗ Error: Could not download SquashFS 4.3 with wget or curl", Colors.FAIL)
             if result and result.stderr:
