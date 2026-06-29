@@ -1,0 +1,23 @@
+name: Sasquatch CI - Standard (x86_64)
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { distro: debian, image: debian:bookworm, pm: apt-get }
+          - { distro: ubuntu, image: ubuntu:24.04, pm: apt-get }
+          - { distro: arch, image: archlinux:latest, pm: pacman }
+          - { distro: fedora, image: fedora:latest, pm: dnf }
+          - { distro: alpine, image: alpine:latest, pm: apk }
+          - { distro: kali, image: kalilinux/kali-rolling, pm: apt-get }
+          - { distro: rocky, image: rockylinux:9, pm: dnf }
+          - { distro: suse, image: opensuse/tumbleweed:latest, pm: zypper }
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@v4
+      # Hier dein Abhängigkeiten-Skript wie gehabt
+      - name: Build
+        run: python3 SASQUATCH_UNIVERSAL_BUILDER.py -v
