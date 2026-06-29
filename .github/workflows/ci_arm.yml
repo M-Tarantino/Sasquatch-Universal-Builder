@@ -1,0 +1,19 @@
+name: Sasquatch CI - ARM64
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { distro: debian_arm64, image: debian:bookworm, pm: apt-get }
+          - { distro: alpine_arm64, image: alpine:latest, pm: apk }
+    container:
+      image: ${{ matrix.image }}
+      options: --platform linux/arm64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Build
+        run: python3 SASQUATCH_UNIVERSAL_BUILDER.py -v
