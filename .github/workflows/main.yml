@@ -46,4 +46,4 @@ jobs:
           fi
 
       - name: Run Sasquatch Universal Builder
-        run: python3 SASQUATCH_UNIVERSAL_BUILDER.py
+        run: python3 SASQUATCH_UNIVERSAL_BUILDER.py -v
