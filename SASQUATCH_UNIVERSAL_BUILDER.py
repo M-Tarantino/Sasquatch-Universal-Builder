@@ -113,28 +113,33 @@ def install_deps(env):
 
     if not env['pkg_mgr']:
         log("No package manager detected. Please install dependencies manually:", Colors.WARN)
-        log("Required: git, patch, make, gcc/clang, zlib, liblzma, lzo", Colors.WARN)
+        log("Required: git, patch, make, gcc/clang, zlib, liblzma, lzo, curl", Colors.WARN)
         return
+
+    # Check if we're in a container (no sudo needed)
+    in_container = os.path.exists('/.dockerenv') or os.environ.get('GITHUB_ACTIONS') == 'true'
+    sudo_prefix = "" if in_container else "sudo "
 
     if env['pkg_mgr'] == 'pkg':
         # Termux
         for pkg in env['packages']:
             log(f"Installing {pkg}...")
-            run_cmd(f"pkg install -y {pkg}", silent=True)
+            run_cmd(f"pkg install -y {pkg}", silent=True, check=False)
     elif env['pkg_mgr'] == 'apt':
         # Debian/Ubuntu
-        log("Note: Using sudo for dependency installation", Colors.WARN)
-        run_cmd("sudo apt-get update", silent=True)
-        run_cmd(f"sudo apt-get install -y {' '.join(env['packages'])}", silent=True)
+        if not in_container:
+            log("Note: Using sudo for dependency installation", Colors.WARN)
+        run_cmd(f"{sudo_prefix}apt-get update -y", silent=True, check=False)
+        run_cmd(f"{sudo_prefix}apt-get install -y {' '.join(env['packages'])}", silent=True, check=False)
     elif env['pkg_mgr'] == 'pacman':
         # Arch Linux
-        run_cmd(f"sudo pacman -S --noconfirm {' '.join(env['packages'])}", silent=True)
+        run_cmd(f"{sudo_prefix}pacman -S --noconfirm {' '.join(env['packages'])}", silent=True, check=False)
     elif env['pkg_mgr'] == 'dnf':
         # Fedora/RHEL
-        run_cmd(f"sudo dnf install -y {' '.join(env['packages'])}", silent=True)
+        run_cmd(f"{sudo_prefix}dnf install -y {' '.join(env['packages'])}", silent=True, check=False)
     elif env['pkg_mgr'] == 'apk':
         # Alpine
-        run_cmd(f"sudo apk add --no-cache {' '.join(env['packages'])}", silent=True)
+        run_cmd(f"{sudo_prefix}apk add --no-cache {' '.join(env['packages'])}", silent=True, check=False)
 
     log("✓ Dependencies installed", Colors.OK)
 
@@ -148,24 +153,30 @@ def setup_source():
     os.chdir(BUILD_DIR)
 
     log("Cloning Sasquatch repository...")
-    result = run_cmd(f"git clone {REPO_URL} repo", silent=True)
+    result = run_cmd(f"git clone {REPO_URL} repo", silent=False, check=False)
     if not result or result.returncode != 0:
         log("Error cloning repository", Colors.FAIL)
+        if result and result.stderr:
+            log(f"Error details: {result.stderr}", Colors.FAIL)
         return False
 
     log("Downloading SquashFS 4.3...")
-    result = run_cmd(f"wget -q {SQUASHFS_URL}")
+    result = run_cmd(f"wget -q {SQUASHFS_URL}", check=False)
     if not result or result.returncode != 0:
         log("Error downloading SquashFS with wget, trying curl...", Colors.WARN)
-        result = run_cmd(f"curl -L -o squashfs4.3.tar.gz {SQUASHFS_URL}")
+        result = run_cmd(f"curl -L -o squashfs4.3.tar.gz {SQUASHFS_URL}", check=False)
         if not result or result.returncode != 0:
             log("Error: Could not download SquashFS 4.3", Colors.FAIL)
+            if result and result.stderr:
+                log(f"Error details: {result.stderr}", Colors.FAIL)
             return False
 
     log("Extracting archive...")
-    result = run_cmd("tar -zxf squashfs4.3.tar.gz")
+    result = run_cmd("tar -zxf squashfs4.3.tar.gz", check=False)
     if not result or result.returncode != 0:
         log("Error extracting archive", Colors.FAIL)
+        if result and result.stderr:
+            log(f"Error details: {result.stderr}", Colors.FAIL)
         return False
 
     if not os.path.exists("squashfs4.3"):
