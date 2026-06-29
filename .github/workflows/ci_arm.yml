@@ -15,13 +15,16 @@ jobs:
     container:
       image: ${{ matrix.image }}
       options: --platform linux/arm64
+      # Dieser Befehl hält den Container am Leben, damit GitHub Actions darin arbeiten kann
+      env:
+        DEBIAN_FRONTEND: noninteractive
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
       - name: Install System Dependencies
         run: |
