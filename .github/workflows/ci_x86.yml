@@ -35,11 +35,11 @@ jobs:
             pacman -Syu --noconfirm
             pacman -S --noconfirm python git wget curl make gcc zlib xz lzo patch binutils
           elif [ "$PM" = "dnf" ]; then
-            dnf install -y python3 git wget curl make gcc gcc-c++ patch binutils zlib-devel xz-devel lzo-devel
+            dnf install -y --allowerasing python3 git wget curl make gcc gcc-c++ patch binutils zlib-devel xz-devel lzo-devel
           elif [ "$PM" = "apk" ]; then
             apk add --no-cache python3 git wget curl make gcc g++ patch binutils-dev zlib-dev xz-dev lzo-dev
           elif [ "$PM" = "zypper" ]; then
-            zypper install -y python3 git wget curl make gcc gcc-c++ patch binutils zlib-devel xz-devel lzo-devel
+            zypper --non-interactive install --replacefiles python3 git wget curl make gcc gcc-c++ patch binutils zlib-devel xz-devel lzo-devel
           fi
 
       - name: Run Sasquatch Universal Builder
